@@ -25,6 +25,7 @@
 #include <lg/types.h>
 #include <lg/interface.h>
 #include <lg/scrservices.h>
+#include <lg/objects.h>
 #include <ScriptLib.h>
 #include "utils.h"
 
