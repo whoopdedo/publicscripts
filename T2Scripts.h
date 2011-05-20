@@ -594,6 +594,70 @@ protected:
 GEN_FACTORY("CorpseFrobFixed","BaseAIScript",cScr_NewCorpseFrob)
 #endif // SCR_GENSCRIPTS
 
+/**
+ * Script: FireShadowEcology
+ * Inherits: BaseScript
+ * Messages: TweqComplete
+ * Links: ControlDevice, Firer
+ * Properties: Tweq\Flicker
+ *
+ * Respawn a creature after it dies. A ``Tweq\Flicker`` fires to test if the
+ * creature needs to be spawned. The tweq flags can be set to only fire when
+ * the player is not looking at the spawn point. That way the creature will
+ * only appear offscreen. The creature archetype to spawn is linked to with
+ * ``ControlDevice``. When spawned, a ``Firer`` link is set from the creature
+ * to the spawn point. A new creature is spawned only when there is no ``Firer``
+ * link to this object.
+ */
+#if !SCR_GENSCRIPTS
+class cScr_SpawnEcology : public cBaseScript
+{
+public:
+	cScr_SpawnEcology(const char* pszName, int iHostObjId)
+		: cBaseScript(pszName, iHostObjId)
+	{ }
+
+private:
+	void MakeFirer(object iSpawnObj);
+	void AttemptSpawn(void);
+
+protected:
+	virtual long OnTimer(sScrTimerMsg*, cMultiParm&);
+	virtual long OnTweqComplete(sTweqMsg*, cMultiParm&);
+};
+#else // SCR_GENSCRIPTS
+GEN_FACTORY("FireShadowEcology","BaseScript",cScr_SpawnEcology)
+#endif // SCR_GENSCRIPTS
+
+/**
+ * Script: FireShadowFlee
+ * Inherits: BaseScript
+ * Messages: Slain
+ * Links: CorpsePart
+ * Properties: Creature\TimeWarp
+ * Metaproperties: M-FireShadowFlee
+ *
+ * A creature that flees when killed. On ``Slain``, the creature drops its
+ * ``CorpsePart`` linked objects and gets the ``M-FireShadowFlee`` metaproperty.
+ * The creature speed is accelerated until it disappears from the player's
+ * view, or after 15 seconds. Then it is destroyed.
+ */
+#if !SCR_GENSCRIPTS
+class cScr_CorpseFlee : public cBaseScript
+{
+public:
+	cScr_CorpseFlee(const char* pszName, int iHostObjId)
+		: cBaseScript(pszName, iHostObjId)
+	{ }
+
+protected:
+	virtual long OnTimer(sScrTimerMsg*, cMultiParm&);
+	virtual long OnSlain(sSlayMsg*, cMultiParm&);
+};
+#else // SCR_GENSCRIPTS
+GEN_FACTORY("FireShadowFlee","BaseScript",cScr_CorpseFlee)
+#endif // SCR_GENSCRIPTS
+
 
 /*** miss03 ***/
 

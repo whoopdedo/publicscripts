@@ -1246,6 +1246,125 @@ long cScr_NewCorpseFrob::OnFrobWorldEnd(sFrobMsg* pFrobMsg, cMultiParm& mpReply)
 
 
 /***
+ * FireShadowEcology
+ */
+void cScr_SpawnEcology::MakeFirer(object iSpawnObj)
+{
+	SService<ILinkSrv> pLS(g_pScriptManager);
+	SService<ILinkToolsSrv> pLTS(g_pScriptManager);
+	link lFirer;
+	pLS->Create(lFirer, pLTS->LinkKindNamed("Firer"), iSpawnObj, ObjId());
+}
+
+void cScr_SpawnEcology::AttemptSpawn(void)
+{
+	SService<ILinkSrv> pLS(g_pScriptManager);
+	SService<ILinkToolsSrv> pLTS(g_pScriptManager);
+	true_bool bFirer;
+	pLS->AnyExist(bFirer, pLTS->LinkKindNamed("Firer"), 0, ObjId());
+	if (bFirer)
+		return;
+	linkset ls;
+	pLS->GetAllInheritedSingle(ls, pLTS->LinkKindNamed("ControlDevice"), ObjId(), 0);
+	if (ls.AnyLinksLeft())
+	{
+		SService<IObjectSrv> pOS(g_pScriptManager);
+		sLink sl = ls.Get();
+		object oSpawn;
+		pOS->BeginCreate(oSpawn, sl.dest);
+		if (oSpawn)
+		{
+			pOS->Teleport(oSpawn, cScrVec::Zero, cScrVec::Zero, ObjId());
+			pOS->EndCreate(oSpawn);
+			SetTimedMessage("Firer", 100, kSTM_OneShot, oSpawn);
+			SService<ISoundScrSrv> pSounds(g_pScriptManager);
+			true_bool __p;
+			pSounds->PlayAtObject(__p, ObjId(), "Event Launch", ObjId(), kSoundNormal, kSoundNetNormal);
+		}
+	}
+}
+
+long cScr_SpawnEcology::OnTweqComplete(sTweqMsg* pTweqMsg, cMultiParm& mpReply)
+{
+	if (pTweqMsg->Type == kTweqTypeFlicker && pTweqMsg->Op == kTweqOpFrameEvent)
+	{
+		AttemptSpawn();
+	}
+
+	return cBaseScript::OnTweqComplete(pTweqMsg, mpReply);
+}
+
+long cScr_SpawnEcology::OnTimer(sScrTimerMsg* pTimerMsg, cMultiParm& mpReply)
+{
+	if (!strcmp(pTimerMsg->name, "Firer"))
+	{
+		MakeFirer(pTimerMsg->data);
+		return 0;
+	}
+
+	return cBaseScript::OnTimer(pTimerMsg, mpReply);
+}
+
+
+/***
+ * FireShadowFlee
+ */
+long cScr_CorpseFlee::OnSlain(sSlayMsg* pSlayMsg, cMultiParm& mpReply)
+{
+	SService<IPhysSrv> pPhys(g_pScriptManager);
+	SService<ILinkSrv> pLS(g_pScriptManager);
+	SService<ILinkToolsSrv> pLTS(g_pScriptManager);
+	linkset ls;
+	pLS->GetAllInheritedSingle(ls, pLTS->LinkKindNamed("CorpsePart"), ObjId(), 0);
+	for (; ls.AnyLinksLeft(); ls.NextLink())
+	{
+		sLink sl = ls.Get();
+		object oDrop;
+		pPhys->LaunchProjectile(oDrop, ObjId(), sl.dest, 0, 10, cScrVec::Zero);
+	}
+
+	SService<IObjectSrv> pOS(g_pScriptManager);
+	SService<IPropertySrv> pPS(g_pScriptManager);
+	object oMP;
+	pOS->Named(oMP, "M-FireShadowFlee");
+	if (oMP)
+		pOS->AddMetaProperty(ObjId(), oMP);
+	pPS->Add(ObjId(), "TimeWarp");
+	pPS->SetSimple(ObjId(), "TimeWarp", 13.0f/16.0f);
+
+	SetTimedMessage("CorpseFlee", 1000, kSTM_Periodic);
+
+	return cBaseScript::OnSlain(pSlayMsg, mpReply);
+}
+
+long cScr_CorpseFlee::OnTimer(sScrTimerMsg* pTimerMsg, cMultiParm& mpReply)
+{
+	if (!strcmp(pTimerMsg->name, "CorpseFlee"))
+	{
+		SService<IObjectSrv> pOS(g_pScriptManager);
+		SService<IPropertySrv> pPS(g_pScriptManager);
+		cMultiParm mpProp;
+		pPS->Get(mpProp, ObjId(), "TimeWarp", NULL);
+		double fSpeed = mpProp;
+		fSpeed *= 0.8125;
+		true_bool bVis;
+		if (fSpeed < 0.03 || ! *pOS->RenderedThisFrame(bVis, ObjId()))
+		{
+			pOS->Destroy(ObjId());
+		}
+		else
+		{
+			mpProp = fSpeed;
+			pPS->SetSimple(ObjId(), "TimeWarp", mpProp);
+		}
+		return 0;
+	}
+
+	return cBaseScript::OnTimer(pTimerMsg, mpReply);
+}
+
+
+/***
  * ReallyLocked
  */
 long cScr_LockFrobInert::OnSim(sSimMsg* pSimMsg, cMultiParm& mpReply)
