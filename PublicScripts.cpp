@@ -36,6 +36,7 @@
 #include <cstdlib>
 #include <cstdio>
 #include <cmath>
+#include <cctype>
 #include <list>
 #include <utility>
 #include <algorithm>
@@ -311,9 +312,7 @@ STDMETHODIMP cScr_SMTrans::ReceiveMessage(sScrMsg* pMsg, sMultiParm* pReply, eSc
 	// Clear all but Invert
 	// Can't use Once because this script is likely on an object which uses the lock
 	SetFlags(GetFlags() & (kTrapFlagInvert));
-	SMTrans_params params;
-	params.pszMsg = pMsg->message;
-	params.iCount = 0;
+	SMTrans_params params = {pMsg->message, 0};
 	IterateLinks("ScriptParams", ObjId(), 0, LinkIter, this, reinterpret_cast<void*>(&params));
 
 	return 0;
@@ -368,11 +367,9 @@ STDMETHODIMP cScr_Forwarder::ReceiveMessage(sScrMsg* pMsg, sMultiParm* pReply, e
 {
 	cBaseTrap::ReceiveMessage(pMsg, pReply, eTrace);
 
-	Forwarder_params params;
+	Forwarder_params params = {pMsg, 0};
 	pMsg->AddRef();
-	params.pMsg = pMsg;
 	int iSaveFlags = pMsg->flags;
-	params.iCount = 0;
 	IterateLinks("ScriptParams", ObjId(), 0, LinkIter, this, reinterpret_cast<void*>(&params));
 	pMsg->flags = iSaveFlags;
 	pMsg->Release();
@@ -1759,9 +1756,7 @@ long cScr_MotionTrap::OnSwitch(bool bTurnOn, sScrMsg* pMsg, cMultiParm& mpReply)
 		if (pszMot)
 		{
 			SService<IPuppetSrv> pPuppet(g_pScriptManager);
-			MotionTrap_params data;
-			data.pPuppet = pPuppet.get();
-			data.pszMot = pszMot;
+			MotionTrap_params data = {pPuppet.get(), pszMot};
 			IterateLinks("ControlDevice", ObjId(), 0, LinkIter, this, reinterpret_cast<void*>(&data));
 			g_pMalloc->Free(pszMot);
 		}
@@ -3257,6 +3252,244 @@ long cScr_Squelch::OnSwitch(bool bTurnOn, sScrMsg* pMsg, cMultiParm& mpReply)
 	SetScriptData("LastOn", bTurnOn);
 	SetScriptData("LastTime", pMsg->time);
 	DirectTrigger(bTurnOn, pMsg->data);
+
+	return cBaseTrap::OnSwitch(bTurnOn, pMsg, mpReply);
+}
+
+
+/***
+ * PropertyScript
+ */
+char const* const* cScr_PropertyTrap::GetFieldNames(char* names)
+{
+	if (!names || !*names)
+		return NULL;
+	char** fields;
+	int n = 1;
+	char* p = names;
+	while ((p = strchr(p, ','))) ++n;
+	fields = new char*[n+1];
+	fields[n] = NULL;
+	for (p = names, n = 0; p; n++)
+	{
+		while (*p == ' ') ++p;
+		fields[n] = p;
+		p = strchr(p, ',');
+		char* q;
+		if (p)
+			q = p++;
+		else
+			q = fields[n] + strlen(fields[n]);
+		while (*(q-1) == ' ') --q;
+		*q = '\0';
+	}
+	return fields;
+}
+
+int cScr_PropertyTrap::MatchFieldName(const char* name, const sFieldDesc* fields, int num_fields)
+{
+	char fname[32];
+	ulong len = strlen(name);
+	int num = 0;
+	int i, j;
+	char *p, *q;
+	p = strchr(name, '[');
+	if (p)
+	{
+		len = p++ - name;
+		num = strtol(p, NULL, 10);
+		if (num < 1) num = 1;
+	}
+	if (num > num_fields)
+		num = num_fields;
+	if (len == 0)
+		return num-1;
+	if (len > 32)
+		len = 32;
+	for (i = 0; i < num_fields; i++)
+	{
+		p = const_cast<char*>(fields[i].name);
+		q = fname;
+		for (j = 0; j < 32; p++, j++)
+		{
+			if (isalnum(*p))
+				*q++ = *p;
+		}
+		if (!_strnicmp(fname, name, len))
+		{
+			if (--num == 0)
+				return i;
+		}
+	}
+	return -1;
+}
+
+bool cScr_PropertyTrap::ParsePropertyFields(IStructDescTools* pSD, const sStructDesc* pSDesc,
+				void* pData, char* pszValues, char const* const* pszFields)
+{
+	int maxn, n = 0;
+	char* pszVal = pszValues;
+	if (pszFields)
+	{
+		maxn = 0;
+		while (pszFields[maxn])
+			++maxn;
+	}
+	else
+		maxn = pSDesc->num_fields;
+	for (pszVal = pszValues; pszVal && *pszVal && n < maxn; ++n)
+	{
+		char* psz;
+		if (*pszVal == '(' && (psz = strchr(pszVal, ')')))
+		{
+			if (++pszVal == psz)
+			{
+				psz = strchr(psz, ',');
+				if (psz) ++psz;
+		DebugPrintf("PropTrap:    skipping field %s", pszFields?pszFields[n]:pSDesc->fields[n].name);
+				pszVal = psz;
+				continue;
+			}
+			*psz++ = '\0';
+			psz = strchr(psz, ',');
+			if (psz) ++psz;
+		}
+		else
+		{
+			psz = strchr(pszVal, ',');
+			if (psz)
+				*psz++ = '\0';
+		}
+		DebugPrintf("PropTrap:    setting field %s: %s", pszFields?pszFields[n]:pSDesc->fields[n].name, pszVal);
+		if (pszFields)
+		{
+			int f = MatchFieldName(pszFields[n], pSDesc->fields, pSDesc->num_fields);
+			if (f == -1 || pSD->ParseField(&pSDesc->fields[f], pszVal, pData) != S_OK)
+				return false;
+		}
+		else
+		{
+			if (pSD->ParseField(&pSDesc->fields[n], pszVal, pData) != S_OK)
+				return false;
+		}
+		pszVal = psz;
+	}
+	return true;
+}
+
+bool cScr_PropertyTrap::ParseProperty(int iObjId, IProperty* pProp, const char* pszTypeName,
+				char* pszValues, char const* const* pszFields)
+{
+	SInterface<IStructDescTools> pSD(g_pScriptManager);
+	SInterface<IPropertyStore> pStore(pProp);
+	sDatum dat;
+	void* pData;
+	bool created = !pStore->Relevant(iObjId);
+	if (created)
+	{
+		SInterface<ITrait> pTrait(pProp);
+		int inherit = pTrait->GetDonor(iObjId);
+		if (inherit)
+			pStore->Copy(dat, iObjId, inherit);
+		else
+			pStore->Create(dat, iObjId);
+	}
+	// Operate on a copy of the data in case parsing fails.
+	pStore->GetCopy(iObjId, &dat);
+	SInterface<IDataOps> pOps(pStore->GetOps());
+	if (pOps && pOps->BlockSize(dat) >= 0)
+		pData = dat.pv;
+	else
+		pData = &dat;
+
+	bool success;
+	const sStructDesc* pSDesc = pSD->Lookup(pszTypeName);
+	switch (pSDesc->num_fields)
+	{
+		case 0:
+			success = true;
+			break;
+		case 1:
+			DebugPrintf("PropTrap:    setting simple: %s", pszValues);
+			success = pSD->ParseSimple(pSDesc, pszValues, pData);
+			break;
+		default:
+			success = ParsePropertyFields(pSD, pSDesc, pData, pszValues, pszFields);
+			break;
+	}
+	if (!success)
+	{
+		pStore->ReleaseCopy(iObjId, dat);
+		if (created)
+			pStore->Delete(iObjId);
+		return false;
+	}
+
+	pStore->Set(iObjId, dat);
+	pStore->ReleaseCopy(iObjId, dat);
+	pProp->Touch(iObjId);
+	return true;
+}
+
+bool cScr_PropertyTrap::ParseStringProperty(int iObjId, IProperty* pProp, char* pszValue)
+{
+	try
+	{
+		SInterface<IStringProperty> pSProp(pProp);
+		DebugPrintf("PropTrap:    setting string: %s", pszValue);
+		if (pSProp->Set(iObjId, pszValue) == S_OK)
+			return true;
+	}
+	catch (no_interface&)
+	{
+	}
+	return false;
+}
+
+struct PropTrap_params
+{
+	IProperty* pProp;
+	char* pszValues;
+	char const* const* pszFields;
+};
+
+int cScr_PropertyTrap::LinkIter(ILinkSrv*, ILinkQuery* pLQ, IScript* pScript, void* pData)
+{
+	cScr_PropertyTrap* scrPropTrap = static_cast<cScr_PropertyTrap*>(pScript);
+	PropTrap_params* params = reinterpret_cast<PropTrap_params*>(pData);
+	sLink sl;
+	pLQ->Link(&sl);
+	const sPropertyTypeDesc* pTypeDesc = params->pProp->DescribeType();
+	DebugPrintf("PropTrap: Setting property %s on %d.", pTypeDesc->szTypeName, int(sl.dest));
+	if (pTypeDesc->uTypeSize == 0)
+		scrPropTrap->ParseStringProperty(sl.dest, params->pProp, params->pszValues);
+	else
+		scrPropTrap->ParseProperty(sl.dest, params->pProp, pTypeDesc->szTypeName, params->pszValues, params->pszFields);
+	return 1;
+}
+
+long cScr_PropertyTrap::OnSwitch(bool bTurnOn, sScrMsg* pMsg, cMultiParm& mpReply)
+{
+	char* pszPropName = GetObjectParamString(ObjId(), "property");
+	char* pszValues = GetObjectParamString(ObjId(), bTurnOn ? "onvalue" : "offvalue");
+	char* pszFields = GetObjectParamString(ObjId(), "fields");
+	if (pszPropName && pszValues)
+	{
+		SInterface<IPropertyManager> pPM(g_pScriptManager);
+		SInterface<IProperty> pProp = pPM->GetPropertyNamed(pszPropName);
+		if (pProp && pProp->GetID() != -1)
+		{
+			PropTrap_params data = {pProp.get(), pszValues, GetFieldNames(pszFields)};
+			IterateLinks(g_pszCDLinkFlavor, ObjId(), 0, LinkIter, this, reinterpret_cast<void*>(&data));
+			delete[] data.pszFields;
+		}
+	}
+	if (pszFields)
+		g_pMalloc->Free(pszFields);
+	if (pszValues)
+		g_pMalloc->Free(pszValues);
+	if (pszPropName)
+		g_pMalloc->Free(pszPropName);
 
 	return cBaseTrap::OnSwitch(bTurnOn, pMsg, mpReply);
 }

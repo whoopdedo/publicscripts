@@ -26,6 +26,7 @@
 #include <lg/objstd.h>
 #include <lg/scrservices.h>
 #include <lg/links.h>
+#include <lg/tools.h>
 #include <darkhook.h>
 #include "BaseScript.h"
 #include "BaseTrap.h"
@@ -1604,6 +1605,63 @@ protected:
 };
 #else // SCR_GENSCRIPTS
 GEN_FACTORY("TrapSquelch","BaseTrap",cScr_Squelch)
+#endif // SCR_GENSCRIPTS
+
+/**
+ * Script: PropertyScript
+ * Inherits: BaseTrap
+ * Parameter: property(string) - Name of the property to modify.
+ * Parameter: fields(string) - List of property fields.
+ * Parameter: onvalue(string) - Value or list of values to set when turned on.
+ * Parameter: offvalue(string) - Value or list of values to set when turned off.
+ *
+ * Modifies the value of a property. The property name is the short name of the
+ * property as listed by ``list_props``. Simple properties do not need a $$fields$$
+ * parameter and the value parameter is a single string. If the property has
+ * multiple fields, then the value parameter is a list of comma-separated values.
+ * With the $$fields$$ parameter, only the named fields are modified and the value
+ * parameter is a list that corresponds to those fields. Fields that don't have a
+ * listed value are unchanged. If either $$onvalue$$ or $$offvalue$$ is omitted,
+ * then the property is not changed for that switch.
+ *
+ * Property fields are named with an abbreviated format. Take the original name,
+ * as displayed in the Dromed object editor, and ignore anything that isn't a letter
+ * or number. Match the first field that starts with the name given in the $$fields$$
+ * parameter. The parameter name can end with a number enclosed in square braces.
+ * This is the subscript and will match the n-th field that starts with the name.
+ * So ''A[1]'' will match the first field that has the first letter ''A'', and
+ * ''A[2]'' will match the second field that starts with ''A''.
+ *
+ * Values are either a string, number, boolean, or vector. Multiple values are given as
+ * a list of values separated by commas. Any value in the list can be enclosed in
+ * parentheses. A pair of parentheses with nothing in-between is a null value and indicates
+ * that field should not be changed. An empty value not in parentheses is a blank string.
+ * A vector is three number separated by commas. Because commas are used between values,
+ * a vector in a list must be enclosed in parentheses.
+ */
+#if !SCR_GENSCRIPTS
+class cScr_PropertyTrap : public cBaseTrap
+{
+public:
+	cScr_PropertyTrap(const char* pszName, int iHostObjId)
+		: cBaseTrap(pszName, iHostObjId)
+	{ }
+
+private:
+	bool ParseProperty(int iObjId, IProperty* pProp, const char* pszTypeName,
+					char* pszValues, char const* const* pszFields);
+	bool ParsePropertyFields(IStructDescTools* pSD, const sStructDesc* pSDesc, void* pData,
+					char* pszValues, char const* const* pszFields);
+	bool ParseStringProperty(int iObjId, IProperty* pProp, char* pszValue);
+	static int LinkIter(ILinkSrv*, ILinkQuery* pLQ, IScript*, void* pData);
+	char const* const* GetFieldNames(char* names);
+	int MatchFieldName(const char* name, const sFieldDesc* fields, int num_fields);
+
+protected:
+	virtual long OnSwitch(bool, sScrMsg*, cMultiParm&);
+};
+#else // SCR_GENSCRIPTS
+GEN_FACTORY("PropertyScript","BaseTrap",cScr_PropertyTrap)
 #endif // SCR_GENSCRIPTS
 
 
