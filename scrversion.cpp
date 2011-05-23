@@ -385,7 +385,7 @@ static void DoPostMessage(int iSrc, int iDest, const char* pszMsg)
 	"\tcall dword ptr [edx+0x6C]\n"
 	"\tmov esp,edi\n"
 	"\tpop edi\n"
-	:: "g"(g_pScriptManager), "g"(iSrc), "g"(iDest), "g"(pszMsg)
+	:: "m"(g_pScriptManager), "g"(iSrc), "g"(iDest), "g"(pszMsg)
 	);
 #else
 	_asm {
