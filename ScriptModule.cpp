@@ -20,6 +20,7 @@
  *****************************************************************************/
 
 #include "ScriptModule.h"
+#include "Allocator.h"
 
 #include <cstring>
 
@@ -33,6 +34,9 @@ IMalloc *g_pMalloc = NULL;
 IScriptMan *g_pScriptManager = NULL;
 volatile MPrintfProc g_pfnMPrintf = NullPrintf;
 
+cMemoryAllocator g_Allocator;
+cScriptModule  g_ScriptModule;
+
 static int __cdecl NullPrintf(const char*, ...)
 {
 	return 0;
@@ -42,6 +46,10 @@ cScriptModule::~cScriptModule()
 {
 	if (m_pszName != sm_ScriptModuleName)
 		delete[] m_pszName;
+#ifdef DEBUG
+	g_pfnMPrintf("cMemoryAllocator: Current %ld blocks for %ld bytes\n", g_Allocator.CountBlocks(), g_Allocator.CountSize());
+	g_pfnMPrintf("cMemoryAllocator: Total %ld allocations avg %ld bytes\n", g_Allocator.CountAlloc(), g_Allocator.CountAverage());
+#endif
 }
 
 cScriptModule::cScriptModule()
@@ -96,8 +104,6 @@ STDMETHODIMP_(void) cScriptModule::EndClassIter(tScrIter*)
 }
 
 
-cScriptModule  g_ScriptModule;
-
 extern "C"
 int __declspec(dllexport) __stdcall
 ScriptModuleInit (const char* pszName,
@@ -109,13 +115,7 @@ ScriptModuleInit (const char* pszName,
 	*pOutInterface = NULL;
 
 	g_pScriptManager = pScriptMan;
-#ifdef _DEBUG
-	pMalloc->QueryInterface(IID_IDebugMalloc, reinterpret_cast<void**>(&g_pMalloc));
-	if (!g_pMalloc)
-		g_pMalloc = pMalloc;
-#else
-	g_pMalloc = pMalloc;
-#endif
+	g_pMalloc = g_Allocator.AttachMalloc(pMalloc, cScriptModule::sm_ScriptModuleName);
 
 	if (pfnMPrintf)
 		g_pfnMPrintf = pfnMPrintf;

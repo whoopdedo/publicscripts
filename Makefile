@@ -78,7 +78,7 @@ INCLUDES = -I. -I$(srcdir) -I$(LGDIR) -I$(SCRLIBDIR) -I$(DH2DIR)
 CXXFLAGS = -W -Wall -masm=intel
 DLLFLAGS = --add-underscore
 
-OSM_OBJS = $(bindir)/ScriptModule.o $(bindir)/Script.o $(bindir)/exports.o
+OSM_OBJS = $(bindir)/ScriptModule.o $(bindir)/Script.o $(bindir)/Allocator.o $(bindir)/exports.o
 BASE_OBJS = $(bindir)/MsgHandlerArray.o
 BASE1_OBJS = $(bin1dir)/BaseTrap.o $(bin1dir)/BaseScript.o $(bin1dir)/CommonScripts.o
 BASE2_OBJS = $(bin2dir)/BaseTrap.o $(bin2dir)/BaseScript.o $(bin2dir)/CommonScripts.o
@@ -146,8 +146,9 @@ $(bin3dir):
 $(bindir)/exports.o: $(bindir)/ScriptModule.o
 	$(DLLTOOL) $(DLLFLAGS) --dllname script.osm --output-exp $@ $^
 
-$(bindir)/ScriptModule.o: ScriptModule.cpp ScriptModule.h
+$(bindir)/ScriptModule.o: ScriptModule.cpp ScriptModule.h Allocator.h
 $(bindir)/Script.o: Script.cpp Script.h
+$(bindir)/Allocator.o: Allocator.cpp Allocator.h
 
 $(bin1dir)/BaseScript.o: BaseScript.cpp BaseScript.h Script.h ScriptModule.h MsgHandlerArray.h
 $(bin2dir)/BaseScript.o: BaseScript.cpp BaseScript.h Script.h ScriptModule.h MsgHandlerArray.h

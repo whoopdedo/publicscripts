@@ -68,7 +68,7 @@ LIBS = $(LGLIB) uuid.lib $(baselibs)
 INCLUDES = -I. -I$(srcdir) -I$(LGDIR) -I$(SCRLIBDIR) -I$(DH2DIR)
 CXXFLAGS = $(cflags) -nologo -W3 -wd4800 -TP -EHsc
 
-OSM_OBJS = $(bindir)\ScriptModule.obj $(bindir)\Script.obj
+OSM_OBJS = $(bindir)\ScriptModule.obj $(bindir)\Script.obj $(bindir)\Allocator.obj
 BASE_OBJS = $(bindir)\MsgHandlerArray.obj
 BASE1_OBJS = $(bin1dir)\BaseTrap.obj $(bin1dir)\BaseScript.obj $(bin1dir)\CommonScripts.obj
 BASE2_OBJS = $(bin2dir)\BaseTrap.obj $(bin2dir)\BaseScript.obj $(bin2dir)\CommonScripts.obj
@@ -137,8 +137,9 @@ $(bin2dir):
 $(bin3dir):
 	mkdir $@
 
-$(bindir)\ScriptModule.obj: ScriptModule.cpp ScriptModule.h
+$(bindir)\ScriptModule.obj: ScriptModule.cpp ScriptModule.h Allocator.h
 $(bindir)\Script.obj: Script.cpp Script.h
+$(bindir)\Allocator.obj: Allocator.cpp Allocator.h
 
 $(bin1dir)\BaseScript.obj: BaseScript.cpp BaseScript.h Script.h ScriptModule.h MsgHandlerArray.h
 $(bin2dir)\BaseScript.obj: BaseScript.cpp BaseScript.h Script.h ScriptModule.h MsgHandlerArray.h
