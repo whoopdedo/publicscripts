@@ -3404,25 +3404,15 @@ bool cScr_PropertyTrap::ParseProperty(int iObjId, IProperty* pProp, const char* 
 
 	bool success;
 	const sStructDesc* pSDesc = pSD->Lookup(pszTypeName);
-	switch (pSDesc->num_fields)
+	if (pSDesc->num_fields > 0)
 	{
-		case 0:
-			success = true;
-			break;
-		case 1:
-			DebugPrintf("PropTrap:    setting simple: %s", pszValues);
-			success = pSD->ParseSimple(pSDesc, pszValues, pData);
-			break;
-		default:
-			success = ParsePropertyFields(pSD, pSDesc, pData, pszValues, pszFields);
-			break;
-	}
-	if (!success)
-	{
-		pStore->ReleaseCopy(iObjId, dat);
-		if (created)
-			pStore->Delete(iObjId);
-		return false;
+		if (!ParsePropertyFields(pSD, pSDesc, pData, pszValues, pszFields))
+		{
+			pStore->ReleaseCopy(iObjId, dat);
+			if (created)
+				pStore->Delete(iObjId);
+			return false;
+		}
 	}
 
 	pStore->Set(iObjId, dat);
