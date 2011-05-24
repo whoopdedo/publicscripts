@@ -53,22 +53,26 @@ void* operator new[](std::size_t size, const std::nothrow_t&) throw()
 
 void operator delete(void* ptr) throw()
 {
-	g_Allocator.Free(ptr);
+	if (ptr)
+		g_Allocator.Free(ptr);
 }
 
 void operator delete[](void* ptr) throw()
 {
-	g_Allocator.Free(ptr);
+	if (ptr)
+		g_Allocator.Free(ptr);
 }
 
 void operator delete(void* ptr, const std::nothrow_t&) throw()
 {
-	g_Allocator.Free(ptr);
+	if (ptr)
+		g_Allocator.Free(ptr);
 }
 
 void operator delete[](void* ptr, const std::nothrow_t&) throw()
 {
-	g_Allocator.Free(ptr);
+	if (ptr)
+		g_Allocator.Free(ptr);
 }
 
 cMemoryAllocator::AllocRecord cMemoryAllocator::nullrecord;
@@ -98,9 +102,13 @@ IMalloc* cMemoryAllocator::AttachMalloc(IMalloc* allocator, const char* module)
 	allocator->QueryInterface(IID_IMalloc, reinterpret_cast<void**>(&m_alloc));
 #ifdef DEBUG
 	allocator->QueryInterface(IID_IDebugMalloc, reinterpret_cast<void**>(&m_dballoc));
-	strncpy(m_module, "cMemoryAllocator [", 255);
-	strncat(m_module, module, 255);
-	strncat(m_module, "]", 255);
+	// Because the module may be unloaded, a static buffer will cause problems.
+	// This memory will never be freed, a small price to pay.
+	ulong namelen = strlen(module) + sizeof("cMemoryAllocator []");
+	m_module = static_cast<char*>(allocator->Alloc(namelen));
+	strcpy(m_module, "cMemoryAllocator [");
+	strcat(m_module, module);
+	strcat(m_module, "]");
 #endif
 	assert(m_alloc != NULL);
 	return this;
