@@ -1610,19 +1610,20 @@ GEN_FACTORY("TrapSquelch","BaseTrap",cScr_Squelch)
 /**
  * Script: PropertyScript
  * Inherits: BaseTrap
+ * Links: ControlDevice
  * Parameter: property(string) - Name of the property to modify.
  * Parameter: fields(string) - List of property fields.
  * Parameter: onvalue(string) - Value or list of values to set when turned on.
  * Parameter: offvalue(string) - Value or list of values to set when turned off.
  *
- * Modifies the value of a property. The property name is the short name of the
- * property as listed by ``list_props``. Simple properties do not need a $$fields$$
- * parameter and the value parameter is a single string. If the property has
- * multiple fields, then the value parameter is a list of comma-separated values.
- * With the $$fields$$ parameter, only the named fields are modified and the value
- * parameter is a list that corresponds to those fields. Fields that don't have a
- * listed value are unchanged. If either $$onvalue$$ or $$offvalue$$ is omitted,
- * then the property is not changed for that switch.
+ * Modifies the value of a property on linked objects. The property name is the
+ * short name of the property as listed by ``list_props``. Simple properties do
+ * not need a $$fields$$ parameter and the value parameter is a single string.
+ * If the property has multiple fields, then the value parameter is a list of
+ * comma-separated values. With the $$fields$$ parameter, only the named fields
+ * are modified and the value parameter is a list that corresponds to those fields.
+ * Fields that don't have a listed value are unchanged. If either $$onvalue$$ or
+ * $$offvalue$$ is omitted, then the property is not changed for that switch.
  *
  * Property fields are named with an abbreviated format. Take the original name,
  * as displayed in the Dromed object editor, and ignore anything that isn't a letter
@@ -1662,6 +1663,36 @@ protected:
 };
 #else // SCR_GENSCRIPTS
 GEN_FACTORY("PropertyScript","BaseTrap",cScr_PropertyTrap)
+#endif // SCR_GENSCRIPTS
+
+/**
+ * Script: TrapProperty
+ * Inherits: BaseTrap
+ * Links: ScriptParams(??property??)
+ *
+ * Change the properties on linked objects. Sets the property when turned on,
+ * or deletes it when turned off. The link data is the short name of the
+ * property to set or unset. If the data begins with $$@$$ then the data is
+ * the name of an object and all properties from that object will be copied to
+ * the linked object when turned on.
+ */
+#if !SCR_GENSCRIPTS
+class cScr_SimplePropertyTrap : public cBaseTrap
+{
+public:
+	cScr_SimplePropertyTrap(const char* pszName, int iHostObjId)
+		: cBaseTrap(pszName, iHostObjId)
+	{ }
+
+private:
+	static int LinkIterOn(ILinkSrv*, ILinkQuery* pLQ, IScript*, void* pData);
+	static int LinkIterOff(ILinkSrv*, ILinkQuery* pLQ, IScript*, void* pData);
+
+protected:
+	virtual long OnSwitch(bool, sScrMsg*, cMultiParm&);
+};
+#else // SCR_GENSCRIPTS
+GEN_FACTORY("TrapProperty","BaseTrap",cScr_SimplePropertyTrap)
 #endif // SCR_GENSCRIPTS
 
 

@@ -3402,7 +3402,6 @@ bool cScr_PropertyTrap::ParseProperty(int iObjId, IProperty* pProp, const char* 
 	else
 		pData = &dat;
 
-	bool success;
 	const sStructDesc* pSDesc = pSD->Lookup(pszTypeName);
 	if (pSDesc->num_fields > 0)
 	{
@@ -3480,6 +3479,64 @@ long cScr_PropertyTrap::OnSwitch(bool bTurnOn, sScrMsg* pMsg, cMultiParm& mpRepl
 		g_pMalloc->Free(pszValues);
 	if (pszPropName)
 		g_pMalloc->Free(pszPropName);
+
+	return cBaseTrap::OnSwitch(bTurnOn, pMsg, mpReply);
+}
+
+
+/***
+ * PropertyScript
+ */
+int cScr_SimplePropertyTrap::LinkIterOn(ILinkSrv*, ILinkQuery* pLQ, IScript* pScript, void* pData)
+{
+	IPropertyManager* pPM = static_cast<IPropertyManager*>(pData);
+	cScr_SimplePropertyTrap* scrPropTrap = static_cast<cScr_SimplePropertyTrap*>(pScript);
+	const char* pszLinkData = static_cast<const char*>(pLQ->Data());
+	if (!pszLinkData)
+		return 1;
+	sLink sl;
+	pLQ->Link(&sl);
+	if (pszLinkData[0] == '@')
+	{
+		SInterface<IObjectSystem> pOS(g_pScriptManager);
+		object iSrc = pOS->GetObjectNamed(pszLinkData+1);
+		if (iSrc)
+			pOS->CloneObject(sl.dest, iSrc);
+		return 1;
+	}
+	SInterface<IProperty> pProp = pPM->GetPropertyNamed(pszLinkData);
+	if (pProp && pProp->GetID() != -1)
+	{
+		if (pProp->IsRelevant(scrPropTrap->ObjId()))
+			pProp->Copy(sl.dest, scrPropTrap->ObjId());
+		else
+			pProp->Create(sl.dest);
+	}
+
+	return 1;
+}
+
+int cScr_SimplePropertyTrap::LinkIterOff(ILinkSrv*, ILinkQuery* pLQ, IScript*, void* pData)
+{
+	IPropertyManager* pPM = static_cast<IPropertyManager*>(pData);
+	const char* pszLinkData = static_cast<const char*>(pLQ->Data());
+	if (!pszLinkData || pszLinkData[0] == '@')
+		return 1;
+	sLink sl;
+	pLQ->Link(&sl);
+	SInterface<IProperty> pProp = pPM->GetPropertyNamed(pszLinkData);
+	if (pProp && pProp->GetID() != -1)
+	{
+		pProp->Delete(sl.dest);
+	}
+
+	return 1;
+}
+
+long cScr_SimplePropertyTrap::OnSwitch(bool bTurnOn, sScrMsg* pMsg, cMultiParm& mpReply)
+{
+	SInterface<IPropertyManager> pPM(g_pScriptManager);
+	IterateLinks("ScriptParams", ObjId(), 0, bTurnOn ? LinkIterOn : LinkIterOff, this, pPM.get());
 
 	return cBaseTrap::OnSwitch(bTurnOn, pMsg, mpReply);
 }
