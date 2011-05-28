@@ -106,3 +106,11 @@ bool PreLoad(const cScrStr& name);
  * In SShock2, gets the name of a string from ``Script\Use Message`` and reads the text from ``UseMsg.str``.
  */
 cAnsiStr GetBookText(object iObj);
+
+/**
+ * strniscmp
+ *
+ * Compare strings case-insensitively and considering only alphanumeric characters.
+ * End the comparison after reading ??len?? bytes (including spaces) from ??str1??.
+ */
+int strnalnumcmp(const char* str1, const char* str2, size_t len);

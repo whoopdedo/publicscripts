@@ -29,6 +29,7 @@
 #include <cstring>
 #include <cstdio>
 #include <cmath>
+#include <cctype>
 
 static const char* g_pszAbbrevMsgArray[][2] = {
 	{"FIB",      "FrobInvBegin"},
@@ -388,3 +389,36 @@ cAnsiStr GetBookText(object iObj)
 	return strText;
 }
 
+static const bool stralnumtable[128] = {
+	 0,0, 0,0,0,0,0, 0,1,1,1,1,1,1, 0,0,  0,0,0,0,0,0,0,0,0,0, 0, 0, 0, 0,0,0,
+	1,0,1,0,0,0,0,1,1,1, 0, 0,1, 0,1,0,  0,0,0,0,0,0,0,0,0,0,1,1, 0, 0,0,0,
+	 0,0, 0,0,0,0,0, 0, 0, 0, 0, 0, 0, 0, 0,0,  0,0,0,0,0,0,0,0,0,0, 0,1, 0,1,0,0,
+	1,0, 0,0,0,0,0, 0, 0, 0, 0, 0, 0, 0, 0,0,  0,0,0,0,0,0,0,0,0,0, 0,1, 0,1,0,1
+};
+
+inline bool skipchar(unsigned char x)
+{
+	return ((x&0x80)==0) && (stralnumtable[x]);
+}
+
+int strnalnumcmp(const char* str1, const char* str2, size_t len)
+{
+	const char* p = str1;
+	const char* q = str2;
+	const char* end = p + len;
+	int d;
+	while (skipchar(*p)) ++p;
+	while (skipchar(*q)) ++q;
+	while (*p && *q)
+	{
+		d = tolower(*q) - tolower(*p);
+		if (d != 0)
+			return (d < 0) ? -1 : 1;
+		while (skipchar(*++p)) ;
+		while (skipchar(*++q)) ;
+		if (p >= end)
+			return 0;
+	}
+	d = *q - *p;
+	return (d == 0) ? 0 : (d < 0) ? -1 : 1;
+}

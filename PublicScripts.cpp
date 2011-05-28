@@ -3272,7 +3272,7 @@ char const* const* cScr_PropertyTrap::GetFieldNames(char* names)
 	fields[n] = NULL;
 	for (p = names, n = 0; p; n++)
 	{
-		while (*p == ' ') ++p;
+		while (isspace(*p)) ++p;
 		fields[n] = p;
 		p = strchr(p, ',');
 		char* q;
@@ -3280,7 +3280,7 @@ char const* const* cScr_PropertyTrap::GetFieldNames(char* names)
 			q = p++;
 		else
 			q = fields[n] + strlen(fields[n]);
-		while (*(q-1) == ' ') --q;
+		while (isspace(*(q-1))) --q;
 		*q = '\0';
 	}
 	return fields;
@@ -3288,11 +3288,10 @@ char const* const* cScr_PropertyTrap::GetFieldNames(char* names)
 
 int cScr_PropertyTrap::MatchFieldName(const char* name, const sFieldDesc* fields, int num_fields)
 {
-	char fname[32];
 	ulong len = strlen(name);
 	int num = 0;
-	int i, j;
-	char *p, *q;
+	int i;
+	char *p;
 	p = strchr(name, '[');
 	if (p)
 	{
@@ -3304,18 +3303,9 @@ int cScr_PropertyTrap::MatchFieldName(const char* name, const sFieldDesc* fields
 		num = num_fields;
 	if (len == 0)
 		return num-1;
-	if (len > 32)
-		len = 32;
 	for (i = 0; i < num_fields; i++)
 	{
-		p = const_cast<char*>(fields[i].name);
-		q = fname;
-		for (j = 0; j < 32; p++, j++)
-		{
-			if (isalnum(*p))
-				*q++ = *p;
-		}
-		if (!_strnicmp(fname, name, len))
+		if (!strnalnumcmp(name, fields[i].name, len))
 		{
 			if (--num == 0)
 				return i;
