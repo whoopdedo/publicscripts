@@ -1279,7 +1279,8 @@ void cScr_SpawnEcology::AttemptSpawn(void)
 			SetTimedMessage("Firer", 100, kSTM_OneShot, oSpawn);
 			SService<ISoundScrSrv> pSounds(g_pScriptManager);
 			true_bool __p;
-			pSounds->PlayAtObject(__p, ObjId(), "Event Launch", ObjId(), kSoundNormal, kSoundNetNormal);
+			pSounds->PlayEnvSchema(__p, ObjId(), "Event Activate", ObjId(), oSpawn, kEnvSoundAtObjLoc, kSoundNetNormal);
+			CDSend("TurnOn", ObjId(), oSpawn);
 		}
 	}
 }

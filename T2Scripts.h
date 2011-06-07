@@ -600,6 +600,7 @@ GEN_FACTORY("CorpseFrobFixed","BaseAIScript",cScr_NewCorpseFrob)
  * Messages: TweqComplete
  * Links: ControlDevice, Firer
  * Properties: Tweq\Flicker
+ * Schemas: (Event Activate)
  *
  * Respawn a creature after it dies. A ``Tweq\Flicker`` fires to test if the
  * creature needs to be spawned. The tweq flags can be set to only fire when
@@ -607,7 +608,7 @@ GEN_FACTORY("CorpseFrobFixed","BaseAIScript",cScr_NewCorpseFrob)
  * only appear offscreen. The creature archetype to spawn is linked to with
  * ``ControlDevice``. When spawned, a ``Firer`` link is set from the creature
  * to the spawn point. A new creature is spawned only when there is no ``Firer``
- * link to this object.
+ * link to this object. Sends ``TurnOn`` when a new creature is created.
  */
 #if !SCR_GENSCRIPTS
 class cScr_SpawnEcology : public cBaseScript
