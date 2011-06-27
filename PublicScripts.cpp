@@ -30,6 +30,7 @@
 #include <lg/propdefs.h>
 #include <lg/tools.h>
 #include <ScriptLib.h>
+#include <scriptparam.h>
 #include "utils.h"
 
 #include <cstring>
@@ -196,51 +197,44 @@ long cScr_SMRelay::OnSwitch(bool bTurnOn, sScrMsg* pMsg, cMultiParm& mpReply)
 {
 	SMRelay_data data;
 
-	int status_index = 1;
+	InitScriptLib();
+	SService<IScriptParamScriptService> pScriptParams(g_pScriptManager);
+	cScrStr strData;
+	int status_index = pScriptParams->GetInt(ObjId(), "status_index", 1);
 	int have_data = 0;
-	char* pszParams = GetObjectParams(ObjId());
-	if (pszParams)
+	if (pScriptParams->Exists(ObjId(), "data3"))
 	{
-		char* pszData;
-
-		pszData = GetParamString(pszParams, "data3");
-		if (pszData)
-		{
-			have_data |= 1<<2;
-			StringToMultiParm(data.three, pszData);
-			g_pMalloc->Free(pszData);
-		}
-		pszData = GetParamString(pszParams, "data2");
-		if (pszData)
-		{
-			have_data |= 1<<1;
-			StringToMultiParm(data.two, pszData);
-			g_pMalloc->Free(pszData);
-		}
-		pszData = GetParamString(pszParams, "data1");
-		if (pszData)
-		{
-			have_data |= 1;
-			StringToMultiParm(data.one, pszData);
-			g_pMalloc->Free(pszData);
-		}
-
-		status_index = GetParamInt(pszParams, "status_index", 1);
-		pszData = GetParamString(pszParams, "data");
-		if (pszData)
-		{
-			if (status_index)
-				have_data |= 1<<(status_index-1);
-			if (!(have_data & 1))
-				StringToMultiParm(data.one, pszData);
-			else if (!(have_data & 2))
-				StringToMultiParm(data.two, pszData);
-			else if (!(have_data & 4))
-				StringToMultiParm(data.three, pszData);
-			g_pMalloc->Free(pszData);
-		}
-
-		g_pMalloc->Free(pszParams);
+		have_data |= 1<<2;
+		pScriptParams->GetString(ObjId(), "data3", strData);
+		StringToMultiParm(data.three, strData);
+		strData.Free();
+	}
+	if (pScriptParams->Exists(ObjId(), "data2"))
+	{
+		have_data |= 1<<1;
+		pScriptParams->GetString(ObjId(), "data2", strData);
+		StringToMultiParm(data.two, strData);
+		strData.Free();
+	}
+	if (pScriptParams->Exists(ObjId(), "data1"))
+	{
+		have_data |= 1;
+		pScriptParams->GetString(ObjId(), "data1", strData);
+		StringToMultiParm(data.one, strData);
+		strData.Free();
+	}
+	if (pScriptParams->Exists(ObjId(), "data"))
+	{
+		pScriptParams->GetString(ObjId(), "data", strData);
+		if (status_index)
+			have_data |= 1<<(status_index-1);
+		if (!(have_data & 1))
+			StringToMultiParm(data.one, strData);
+		else if (!(have_data & 2))
+			StringToMultiParm(data.two, strData);
+		else if (!(have_data & 4))
+			StringToMultiParm(data.three, strData);
+		strData.Free();
 	}
 	switch (status_index)
 	{
@@ -391,38 +385,36 @@ long cScr_Validator::OnBeginScript(sScrMsg* pMsg, cMultiParm& mpReply)
 long cScr_Validator::OnSwitch(bool bTurnOn, sScrMsg* pMsg, cMultiParm& mpReply)
 {
 	char szParam[12];
+
+	InitScriptLib();
 	sprintf(szParam, "%d", int(m_iValidateParam));
 	SService<ILinkSrv> pLS(g_pScriptManager);
 	SService<ILinkToolsSrv> pLTS(g_pScriptManager);
 	pLS->BroadcastOnAllLinksData(ObjId(), bTurnOn?"TurnOn":"TurnOff", pLTS->LinkKindNamed("ScriptParams"), szParam);
 
-	char* pszParams = GetObjectParams(ObjId());
-	if (pszParams)
+	SService<IScriptParamScriptService> pScriptParams(g_pScriptManager);
+	cScrStr strOrder;
+	if (pScriptParams->GetString(ObjId(), "order", strOrder) == S_OK)
 	{
-		char* pszOrder = GetParamString(pszParams, "order");
-		if (pszOrder)
+		if (!_stricmp(strOrder, "increment"))
 		{
-			if (!_stricmp(pszOrder, "increment"))
-			{
-				int iNext = m_iValidateParam + GetParamInt(pszParams, "increment", 1);
-				if (iNext >= GetParamInt(pszParams, "rollover"))
-					iNext = 0;
-				m_iValidateParam = iNext;
-			}
-			else if (!_stricmp(pszOrder, "step"))
-			{
-				int iNext = m_iValidateParam + GetParamInt(pszParams, "increment", 1);
-				int iStep = GetParamInt(pszParams, "rollover");
-				while (iNext >= iStep)
-				{
-					iNext -= iStep;
-				}
-				m_iValidateParam = iNext;
-			}
-			g_pMalloc->Free(pszOrder);
+			int iNext = m_iValidateParam + pScriptParams->GetInt(ObjId(), "increment", 1);
+			if (iNext >= pScriptParams->GetInt(ObjId(), "rollover"))
+				iNext = 0;
+			m_iValidateParam = iNext;
 		}
-		g_pMalloc->Free(pszParams);
+		else if (!_stricmp(strOrder, "step"))
+		{
+			int iNext = m_iValidateParam + pScriptParams->GetInt(ObjId(), "increment", 1);
+			int iStep = pScriptParams->GetInt(ObjId(), "rollover");
+			while (iNext >= iStep)
+			{
+				iNext -= iStep;
+			}
+			m_iValidateParam = iNext;
+		}
 	}
+	strOrder.Free();
 
 	return cBaseTrap::OnSwitch(bTurnOn, pMsg, mpReply);
 }
@@ -443,80 +435,74 @@ long cScr_Validator::OnMessage(sScrMsg* pMsg, cMultiParm& mpReply)
  */
 long cScr_LinkTrap::OnSwitch(bool bTurnOn, sScrMsg* pMsg, cMultiParm& mpReply)
 {
+	InitScriptLib();
+	SService<IScriptParamScriptService> pScriptParams(g_pScriptManager);
 	SInterface<ILinkManager> pLM(g_pScriptManager);
-	char* pszParams = GetObjectParams(ObjId());
-	if (pszParams)
+	object iObj = pScriptParams->GetObject(ObjId(), "object", ObjId(), int(pMsg->data));
+	if (iObj)
 	{
-		object iObj = GetParamObject(pszParams, "object");
-		if (iObj)
+		object iDest = pScriptParams->GetObject(ObjId(), "dest", ObjId(), int(pMsg->data));
+		linkkind lFlavor, lIgnoreFlavor = 0;
+		cScrStr strFlavor;
+		if (pScriptParams->GetString(ObjId(), "flavor", strFlavor) == S_OK)
 		{
-			object iDest = GetParamObject(pszParams, "dest");
-			linkkind lFlavor;
-			{
-				char* pszFlavor = GetParamString(pszParams, "flavor");
-				if (pszFlavor)
-				{
-					SInterface <IRelation> pRel = pLM->GetRelationNamed(pszFlavor);
-					if (pRel)
-						lFlavor = pRel->GetID();
-					g_pMalloc->Free(pszFlavor);
-				}
-			}
-			linkkind lIgnoreFlavor = 0;
-			if (!lFlavor)
-			{
-				SInterface<IRelation> pRel = pLM->GetRelationNamed(g_pszCDLinkFlavor);
-				if (pRel)
-					lIgnoreFlavor = - pRel->GetID();
-			}
-			bool bOnCreate = GetParamBool(pszParams, "on_create");
-			bool bOffDestroy = GetParamBool(pszParams, "off_destroy");
-			bool bSingleton = GetParamBool(pszParams, "singleton");
+			SInterface <IRelation> pRel = pLM->GetRelationNamed(strFlavor);
+			if (pRel)
+				lFlavor = pRel->GetID();
+		}
+		strFlavor.Free();
+		if (!lFlavor)
+		{
+			SInterface<IRelation> pRel = pLM->GetRelationNamed(g_pszCDLinkFlavor);
+			if (pRel)
+				lIgnoreFlavor = - pRel->GetID();
+		}
+		bool bOnCreate = pScriptParams->GetBool(ObjId(), "on_create");
+		bool bOffDestroy = pScriptParams->GetBool(ObjId(), "off_destroy");
+		bool bSingleton = pScriptParams->GetBool(ObjId(), "singleton");
 
-			object iOldSource, iNewSource;
-			if (bTurnOn)
-			{
-				iOldSource = ObjId();
-				iNewSource = iObj;
-			}
-			else
-			{
-				iOldSource = iObj;
-				iNewSource = ObjId();
-			}
+		object iOldSource, iNewSource;
+		if (bTurnOn)
+		{
+			iOldSource = ObjId();
+			iNewSource = iObj;
+		}
+		else
+		{
+			iOldSource = iObj;
+			iNewSource = ObjId();
+		}
 
-			linkset lsLinks(pLM->Query(iOldSource, iDest, lFlavor));
-			for (; lsLinks.AnyLinksLeft(); lsLinks.NextLink())
+		linkset lsLinks(pLM->Query(iOldSource, iDest, lFlavor));
+		for (; lsLinks.AnyLinksLeft(); lsLinks.NextLink())
+		{
+			sLink sl = lsLinks.Get();
+			if (!sl.flavor || sl.flavor == lIgnoreFlavor)
+				continue;
+			if (!(bSingleton && pLM->AnyLinks(sl.flavor, iNewSource, sl.dest))
+			 && (bTurnOn || !bOffDestroy))
 			{
-				sLink sl = lsLinks.Get();
-				if (!sl.flavor || sl.flavor == lIgnoreFlavor)
-					continue;
-				if (!(bSingleton && pLM->AnyLinks(sl.flavor, iNewSource, sl.dest))
-				 && (bTurnOn || !bOffDestroy))
+				link lNewLink = pLM->Add(iNewSource, sl.dest, sl.flavor);
+				if (lNewLink)
 				{
-					link lNewLink = pLM->Add(iNewSource, sl.dest, sl.flavor);
-					if (lNewLink)
-					{
-						// AddFull data gets preempted by the AIWatchLinkDefaults property
-						// so we do this in two steps.
-						// FIXME: investigate if there are fields that should be masked
-						void* pData = lsLinks.Data();
-						if (pData)
-							pLM->SetData(lNewLink, pData);
-					}
-					else
-					{
-						cMultiParm mp = sl.dest;
-						DebugString("Failed to make link to ", static_cast<const char*>(mp));
-					}
+					// AddFull data gets preempted by the AIWatchLinkDefaults property
+					// so we do this in two steps.
+					// FIXME: investigate if there are fields that should be masked
+					void* pData = lsLinks.Data();
+					if (pData)
+						pLM->SetData(lNewLink, pData);
 				}
-				if (!(bTurnOn && bOnCreate))
+				else
 				{
-					pLM->Remove(lsLinks.Link());
+					cMultiParm mp = sl.dest;
+					DebugString("Failed to make link to ", static_cast<const char*>(mp));
 				}
+			}
+			if (!(bTurnOn && bOnCreate))
+			{
+				pLM->Remove(lsLinks.Link());
 			}
 		}
-		g_pMalloc->Free(pszParams);
 	}
 
 	return cBaseTrap::OnSwitch(bTurnOn, pMsg, mpReply);
@@ -625,21 +611,12 @@ long cScr_DeltaTeleport::OnMessage(sScrMsg* pMsg, cMultiParm& mpReply)
  */
 long cScr_RelayRandom::OnSwitch(bool bTurnOn, sScrMsg* pMsg, cMultiParm& mpReply)
 {
-	bool bWeighted = false;
-	bool bRecharge = false;
-	bool bReusable = false;
-	bool bDontKill = false;
-	char* pszParams = GetObjectParams(ObjId());
-	if (pszParams)
-	{
-		bReusable = GetParamBool(pszParams, "reusable");
-		bDontKill = GetParamBool(pszParams, "preserve");
-		bWeighted = GetParamBool(pszParams, "weighted");
-		bRecharge = GetParamBool(pszParams, "rechargeable");
+	InitScriptLib();
+	SService<IScriptParamScriptService> pScriptParams(g_pScriptManager);
+	bool bWeighted = pScriptParams->GetBool(ObjId(), "weighted");
+	bool bRecharge = pScriptParams->GetBool(ObjId(), "rechargeable");
 
-		g_pMalloc->Free(pszParams);
-	}
-	if (!bReusable)
+	if (!pScriptParams->GetBool(ObjId(), "reusable"))
 		SetFlag(kTrapFlagOnce);
 	if (bRecharge)
 		bWeighted = true;
@@ -703,7 +680,7 @@ long cScr_RelayRandom::OnSwitch(bool bTurnOn, sScrMsg* pMsg, cMultiParm& mpReply
 						cMultiParm mpNeg = - iLink->first;
 						pLTS->LinkSetData(iLink->second, NULL, mpNeg);
 					}
-					else if (!bDontKill)
+					else if (!pScriptParams->GetBool(ObjId(), "preserve"))
 					{
 						pLS->Destroy(iLink->second);
 					}
@@ -719,7 +696,7 @@ long cScr_RelayRandom::OnSwitch(bool bTurnOn, sScrMsg* pMsg, cMultiParm& mpReply
 		if (lDest)
 		{
 			PostMessage(slDest.dest, bTurnOn?"TurnOn":"TurnOff", 0);
-			if (!bDontKill)
+			if (!pScriptParams->GetBool(ObjId(), "preserve"))
 			{
 				SService<ILinkSrv> pLS(g_pScriptManager);
 				pLS->Destroy(lDest);
@@ -788,16 +765,18 @@ int cScr_StimTrap::LinkIter(ILinkSrv*, ILinkQuery* pLQ, IScript* pScript, void* 
 	return 1;
 }
 
-void cScr_StimTrap::StimLinks(float fScale, bool bSelf)
+void cScr_StimTrap::StimLinks(float fScale, bool bSelf, int iFrobber)
 {
+	InitScriptLib();
+	SService<IScriptParamScriptService> pScriptParams(g_pScriptManager);
 	StimTrap_data params;
-	params.iStim = GetObjectParamObject(ObjId(), "stim");
+	params.iStim = pScriptParams->GetObject(ObjId(), "stim", ObjId(), iFrobber);
 	if (!params.iStim)
 		params.iStim = StrToObject("ScriptStim");
 	if (!params.iStim)
 		return;
 
-	params.fIntensity = GetObjectParamFloat(ObjId(), "intensity", 1.0f) * fScale;
+	params.fIntensity = pScriptParams->GetFloat(ObjId(), "intensity", 1.0f) * fScale;
 
 	SService<IActReactSrv> pARSrv(g_pScriptManager);
 	if (bSelf)
@@ -810,7 +789,7 @@ void cScr_StimTrap::StimLinks(float fScale, bool bSelf)
 
 long cScr_StimTrap::OnSwitch(bool bTurnOn, sScrMsg* pMsg, cMultiParm& mpReply)
 {
-	StimLinks(bTurnOn ? 1.0f : -1.0f);
+	StimLinks(bTurnOn ? 1.0f : -1.0f, int(pMsg->data));
 
 	return cBaseTrap::OnSwitch(bTurnOn, pMsg, mpReply);
 }
@@ -862,17 +841,18 @@ void cScr_StimRepeater::StartTimer(void)
 
 long cScr_StimRepeater::OnBeginScript(sScrMsg* pMsg, cMultiParm& mpReply)
 {
+	InitScriptLib();
+	SService<IScriptParamScriptService> pScriptParams(g_pScriptManager);
+
 	m_hTimer.Init();
 	int iInitial = 0;
 	int iInterval = 1000;
 	if (!m_iInterval.Valid())
 	{
-		char* pszInterval = GetObjectParamString(ObjId(), "interval");
-		if (pszInterval)
+		if (pScriptParams->Exists(ObjId(), "interval"))
 		{
-			iInterval = strtotime(pszInterval);
-			iInitial = GetObjectParamInt(ObjId(), "stage");
-			g_pMalloc->Free(pszInterval);
+			iInterval = pScriptParams->GetTime(ObjId(), "interval", 1000);
+			iInitial = pScriptParams->GetInt(ObjId(), "stage");
 		}
 		else // Old-style link kludgery
 		{
@@ -883,7 +863,7 @@ long cScr_StimRepeater::OnBeginScript(sScrMsg* pMsg, cMultiParm& mpReply)
 	m_iInterval.Init(iInterval);
 	m_iScale.Init(iInitial);
 
-	if (pMsg->time > 0 && !GetObjectParamBool(ObjId(), "device"))
+	if (pMsg->time > 0 && !pScriptParams->GetBool(ObjId(), "device"))
 	{
 		StartTimer();
 	}
@@ -1065,14 +1045,16 @@ long cScr_DamageRTC::OnDamage(sDamageScrMsg* pDmgMsg, cMultiParm& mpReply)
  */
 long cScr_HPTrap::OnSwitch(bool bTurnOn, sScrMsg* pMsg, cMultiParm& mpReply)
 {
-	object iVictim = GetObjectParamObject(ObjId(), "target");
+	InitScriptLib();
+	SService<IScriptParamScriptService> pScriptParams(g_pScriptManager);
+	object iVictim = pScriptParams->GetObject(ObjId(), "target", ObjId(), int(pMsg->data));
 	if (iVictim)
 	{
-		object iCulprit = GetObjectParamObject(ObjId(), "culprit", ObjId());
-		int iHP;
-		iHP = GetObjectParamInt(ObjId(), "hitcount", 1);
+		object iCulprit = pScriptParams->GetObject(ObjId(), "culprit", ObjId(), int(pMsg->data));
+		int iHP = pScriptParams->GetInt(ObjId(), "hitcount", 1);
 		SService<IDamageSrv> pDS(g_pScriptManager);
-		pDS->Damage(iVictim, iCulprit, (bTurnOn) ? -iHP : iHP, GetObjectParamObject(ObjId(), "damage"));
+		pDS->Damage(iVictim, iCulprit, (bTurnOn) ? -iHP : iHP, 
+				pScriptParams->GetObject(ObjId(), "damage", ObjId(), int(pMsg->data)));
 	}
 
 	return cBaseTrap::OnSwitch(bTurnOn, pMsg, mpReply);
@@ -1156,6 +1138,8 @@ void cScr_QuickText::ScanText(char* psz)
 
 void cScr_QuickText::DisplayText(void)
 {
+	InitScriptLib();
+	SService<IScriptParamScriptService> pScriptParams(g_pScriptManager);
 	SService<IPropertySrv> pPS(g_pScriptManager);
 #if (_DARKGAME != 3)
 	if (pPS->Possessed(ObjId(), "Book"))
@@ -1163,22 +1147,17 @@ void cScr_QuickText::DisplayText(void)
 		cMultiParm mpBook;
 		pPS->Get(mpBook, ObjId(), "Book", NULL);
 		ulong clr = 0;
-		int iTime = 0;
-		char* pszDNote = GetObjectParams(ObjId());
-		if (pszDNote)
+		int iTime = pScriptParams->GetTime(ObjId(), "time");
+		if (pScriptParams->Exists(ObjId(), "clr"))
 		{
-			char* pszColor = GetParamString(pszDNote, "clr");
-			if (pszColor)
-			{
-				clr = strtocolor(pszColor);
-				g_pMalloc->Free(pszColor);
-			}
-			else
-				clr = makecolor(GetParamInt(pszDNote, "clr_red"),
-						GetParamInt(pszDNote, "clr_green"),
-						GetParamInt(pszDNote, "clr_blue"));
-			iTime = GetParamTime(pszDNote, "time");
-			g_pMalloc->Free(pszDNote);
+			clr = pScriptParams->GetColor(ObjId(), "clr");
+		}
+		else
+		{
+			clr = makecolor(
+					pScriptParams->GetInt(ObjId(), "clr_red"),
+					pScriptParams->GetInt(ObjId(), "clr_green"),
+					pScriptParams->GetInt(ObjId(), "clr_blue"));
 		}
 
 		SService<IDataSrv> pDS(g_pScriptManager);
@@ -1200,38 +1179,39 @@ void cScr_QuickText::DisplayText(void)
 	else
 #endif
 	{
-		char* pszDNote = GetObjectParams(ObjId());
-		if (pszDNote)
+		if (pScriptParams->Exists(ObjId(), "text"))
 		{
-			char* pszText = GetParamString(pszDNote, "text");
-			if (pszText)
+			cScrStr strText;
+			ulong clr = 0;
+			int iTime = pScriptParams->GetTime(ObjId(), "time");
+			pScriptParams->GetString(ObjId(), "text", strText);
+			if (pScriptParams->Exists(ObjId(), "clr"))
 			{
-				ScanText(pszText);
-				ulong c;
-				char* pszColor = GetParamString(pszDNote, "clr");
-				if (pszColor)
-				{
-					c = strtocolor(pszColor);
-					g_pMalloc->Free(pszColor);
-				}
-				else
-					c = makecolor(GetParamInt(pszDNote, "clr_red"),
-							GetParamInt(pszDNote, "clr_green"),
-							GetParamInt(pszDNote, "clr_blue"));
-				int iTime = GetParamTime(pszDNote, "time");
-				if (iTime == 0)
-					iTime = CalcTextTime(pszText, 500);
-				ShowString(pszText, iTime, c);
-
-				g_pMalloc->Free(pszText);
+				clr = pScriptParams->GetColor(ObjId(), "clr");
 			}
 			else
 			{
+				clr = makecolor(
+						pScriptParams->GetInt(ObjId(), "clr_red"),
+						pScriptParams->GetInt(ObjId(), "clr_green"),
+						pScriptParams->GetInt(ObjId(), "clr_blue"));
+			}
+			ScanText(const_cast<char*>(static_cast<const char*>(strText)));
+			if (iTime == 0)
+				iTime = CalcTextTime(strText, 500);
+			ShowString(strText, iTime, clr);
+
+			strText.Free();;
+		}
+		else
+		{
+			char *pszDNote = GetObjectParams(ObjId());
+			if (pszDNote)
+			{
 				ScanText(pszDNote);
 				ShowString(pszDNote, CalcTextTime(pszDNote, 500));
+				g_pMalloc->Free(pszDNote);
 			}
-
-			g_pMalloc->Free(pszDNote);
 		}
 	}
 }
@@ -1432,12 +1412,14 @@ long cScr_Sippable::OnContained(sContainedScrMsg* pContMsg, cMultiParm& mpReply)
  */
 long cScr_Zapper::OnEndAttack(sAttackMsg* pAttackMsg, cMultiParm& mpReply)
 {
+	InitScriptLib();
+	SService<IScriptParamScriptService> pScriptParams(g_pScriptManager);
 	// The AITarget link can sometimes lag behind the actual target.
 	// Probably because of a race between the attack maneuver and
 	// when the link actually gets updated.
 	// As a result, the zap may be wrong when the AI changes targets.
 	object iTarget = GetOneLinkDest("AITarget", ObjId());
-	object iStim = GetObjectParamObject(ObjId(), "zap_stim");
+	object iStim = pScriptParams->GetObject(ObjId(), "zap_stim", ObjId(), iTarget);
 	if (!iStim)
 #if (_DARKGAME == 3)
 		iStim = StrToObject("Anti-Human");
@@ -1446,12 +1428,12 @@ long cScr_Zapper::OnEndAttack(sAttackMsg* pAttackMsg, cMultiParm& mpReply)
 #endif
 	if (iTarget && iStim)
 	{
-		float fIntensity = GetObjectParamFloat(ObjId(), "zap_strength", 3.0);
+		float fIntensity = pScriptParams->GetFloat(ObjId(), "zap_strength", 3.0);
 
 		SService<IActReactSrv> pARSrv(g_pScriptManager);
 		pARSrv->ARStimulate(iTarget, iStim, fIntensity, ObjId());
 
-		if (! GetObjectParamBool(ObjId(), "no_zap_sound"))
+		if (! pScriptParams->GetBool(ObjId(), "no_zap_sound"))
 		{
 			object iSchema = StrToObject(
 					(iTarget == StrToObject("Player")) ?
@@ -1588,26 +1570,21 @@ cScr_AlphaTrap::cScr_AlphaTrap(const char* pszName, int iHostObjId)
 	  SCRIPT_VAROBJ(cScr_AlphaTrap, m_iStartTime, iHostObjId),
 	  m_fAlphaMin(0.0), m_fAlphaMax(1.0), m_iFadeTime(1000), m_iCurve(0)
 {
-	char* pszParams = GetObjectParams(ObjId());
-	if (pszParams)
+	InitScriptLib();
+	SService<IScriptParamScriptService> pScriptParams(g_pScriptManager);
+
+	m_iCurve = pScriptParams->GetInt(ObjId(), "curve");
+	m_fAlphaMin = pScriptParams->GetFloat(ObjId(), "alpha_min", 0.0);
+	m_fAlphaMax = pScriptParams->GetFloat(ObjId(), "alpha_max", 1.0);
+	if (pScriptParams->Exists(ObjId(), "fade_time"))
 	{
-		char* psz;
-		m_iCurve = GetParamInt(pszParams, "curve");
-		m_fAlphaMin = GetParamFloat(pszParams, "alpha_min", 0.0);
-		m_fAlphaMax = GetParamFloat(pszParams, "alpha_max", 1.0);
-		if ((psz = GetParamString(pszParams, "fade_time")))
-		{
-			m_iFadeTime = strtotime(psz);
-			g_pMalloc->Free(psz);
-		}
-		else if ((psz = GetParamString(pszParams, "rate")))
-		{
-			float fRate = strtod(psz, NULL);
-			if (fRate != 0)
-				m_iFadeTime = 1000.0f * (m_fAlphaMax - m_fAlphaMin) / fRate;
-			g_pMalloc->Free(psz);
-		}
-		g_pMalloc->Free(pszParams);
+		m_iFadeTime = pScriptParams->GetTime(ObjId(), "fade_time", 1000);
+	}
+	else
+	{
+		float fRate = pScriptParams->GetTime(ObjId(), "rate");
+		if (fRate != 0)
+			m_iFadeTime = 1000.0f * (m_fAlphaMax - m_fAlphaMin) / fRate;
 	}
 }
 
@@ -2508,7 +2485,7 @@ long cScr_TrapQVarMis::OnSim(sSimMsg* pSimMsg, cMultiParm& mpReply)
 	if (pSimMsg->fStarting)
 	{
 		char* pszInit = GetObjectParamString(ObjId(), "initqv");
-		if (pszInit)
+		if (pszInit && *pszInit)
 		{
 			char* pszName = NULL;
 			auto_ptr<char> pszParam (GetQVarParams(ObjId(), NULL, NULL, &pszName));
@@ -2521,8 +2498,9 @@ long cScr_TrapQVarMis::OnSim(sSimMsg* pSimMsg, cMultiParm& mpReply)
 					iInit = strtol(pszInit, NULL, 0);
 				SetQVar(pszName, iInit);
 			}
-			g_pMalloc->Free(pszInit);
 		}
+		if (pszInit)
+			g_pMalloc->Free(pszInit);
 	}
 
 	return cBaseTrap::OnSim(pSimMsg, mpReply);
@@ -2946,18 +2924,14 @@ long cScr_OBBCret::OnPhysExit(sPhysMsg* pPhysMsg, cMultiParm& mpReply)
  */
 long cScr_FadeTrap::OnSwitch(bool bTurnOn, sScrMsg* pMsg, cMultiParm& mpReply)
 {
-	int iTime = GetObjectParamTime(ObjId(), "fade_time", GetTiming());
+	InitScriptLib();
+	SService<IScriptParamScriptService> pScriptParams(g_pScriptManager);
+	int iTime = pScriptParams->GetTime(ObjId(), "fade_time", GetTiming());
 #if (_DARKGAME == 3)
 	SService<INetworkingSrv> pNet(g_pScriptManager);
 	pNet->Broadcast(ObjId(), "NetFade", 0, bTurnOn);
 
-	ulong iColor = 0;
-	char* pszColor = GetObjectParamString(ObjId(), "fade_color");
-	if (pszColor)
-	{
-		iColor = strtocolor(pszColor);
-		g_pMalloc->Free(pszColor);
-	}
+	ulong iColor = pScriptParams->GetColor(ObjId(), "fade_color");
 	SService<IShockGameSrv> pShock(g_pScriptManager);
 	if (bTurnOn)
 	{
@@ -3059,14 +3033,10 @@ long cScr_FadeTrap::OnMessage(sScrMsg* pMsg, cMultiParm& mpReply)
 {
 	if (!_stricmp(pMsg->message, "NetFade"))
 	{
-		int iTime = GetObjectParamTime(ObjId(), "fade_time", GetTiming());
-		ulong iColor = 0;
-		char* pszColor = GetObjectParamString(ObjId(), "fade_color");
-		if (pszColor)
-		{
-			iColor = strtocolor(pszColor);
-			g_pMalloc->Free(pszColor);
-		}
+		InitScriptLib();
+		SService<IScriptParamScriptService> pScriptParams(g_pScriptManager);
+		int iTime = pScriptParams->GetTime(ObjId(), "fade_time", GetTiming());
+		ulong iColor = pScriptParams->GetColor(ObjId(), "fade_color");
 		SService<IShockGameSrv> pShock(g_pScriptManager);
 		if (pMsg->data)
 		{

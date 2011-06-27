@@ -454,7 +454,7 @@ private:
 	static int LinkIter(ILinkSrv* pLS, ILinkQuery* pLQ, IScript* pScript, void* pData);
 
 protected:
-	void StimLinks(float fScale, bool bSelf = false);
+	void StimLinks(float fScale, bool bSelf = false, int iFrobber = 0);
 
 	virtual long OnSwitch(bool, sScrMsg*, cMultiParm&);
 };

@@ -2356,21 +2356,12 @@ static const char* g_pszDefaultDropMotion = "BH214101";
 void cScr_FactoryWork::PlayMotion(const char* pszType, const char* pszDefault)
 {
 	true_bool __p;
-	char *pszMotion = GetObjectParamString(ObjId(), pszType);
-	if (! pszMotion)
-	{
-		SInterface<ITraitManager> pTM(g_pScriptManager);
-		object iArc = pTM->GetArchetype(ObjId());
-		pszMotion = GetObjectParamString(iArc, pszType);
-		if (! pszMotion)
-			pszMotion = const_cast<char*>(pszDefault);
-	}
+	char *pszMotion = GetObjectParamString(ObjId(), pszType, pszDefault);
 
 	SService<IPuppetSrv> pMotSrv(g_pScriptManager);
 	pMotSrv->PlayMotion(__p, ObjId(), pszMotion);
 
-	if (pszMotion != pszDefault)
-		g_pMalloc->Free(pszMotion);
+	g_pMalloc->Free(pszMotion);
 }
 
 void cScr_FactoryWork::FrobLever(object iTarget)
