@@ -27,6 +27,7 @@
 
 #include <malloc.h>
 #include <cstring>
+#include <cstdlib>
 #include <cstdio>
 #include <cmath>
 #include <cctype>
