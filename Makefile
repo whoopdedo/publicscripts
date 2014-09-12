@@ -44,6 +44,7 @@ AR = ar
 LD = g++
 DLLTOOL = dlltool
 RC = windres
+MKDIR = mkdir -p
 
 DEFINES = -DWINVER=0x0400 -D_WIN32_WINNT=0x0400 -DWIN32_LEAN_AND_MEAN
 GAME1 = -D_DARKGAME=1
@@ -69,7 +70,7 @@ SCR3LIB = -lScript3
 endif
 
 ARFLAGS = rc
-LDFLAGS = -mwindows -mdll -Wl,--enable-auto-image-base
+LDFLAGS = -mwindows -mdll -static-libgcc -static-libstdc++ -Wl,--enable-auto-image-base
 LIBDIRS = -L. -L$(LGDIR) -L$(SCRLIBDIR) -L$(DH2DIR)
 LIBS = $(DH2LIB) $(LGLIB) -luuid
 INCLUDES = -I. -I$(srcdir) -I$(LGDIR) -I$(SCRLIBDIR) -I$(DH2DIR)
@@ -133,13 +134,13 @@ clean:
 	$(RM) $(bindir)/* $(bin1dir)/* $(bin2dir)/* $(bin3dir)/*
 
 $(bindir):
-	mkdir -p $@
+	$(MKDIR) $@
 $(bin1dir):
-	mkdir -p $@
+	$(MKDIR) $@
 $(bin2dir):
-	mkdir -p $@
+	$(MKDIR) $@
 $(bin3dir):
-	mkdir -p $@
+	$(MKDIR) $@
 
 #.INTERMEDIATE: $(bindir)/exports.o
 
